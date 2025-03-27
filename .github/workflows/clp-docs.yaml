@@ -21,11 +21,11 @@ jobs:
         os: ["macos-latest", "ubuntu-latest"]
     runs-on: "${{matrix.os}}"
     steps:
-      - uses: "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"
+      - uses: "actions/checkout@${{ vars.CHECKOUT_VERSION }}"
         with:
           submodules: "recursive"
 
-      - uses: "actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38"
+      - uses: "actions/setup-python@${{ vars.SETUP_PYTHON_VERSION }}"
         with:
           python-version: "3.10"
 
@@ -46,7 +46,7 @@ jobs:
           contains(fromJSON('["push", "workflow_dispatch"]'), github.event_name)
           && ('refs/heads/main' == github.ref || startsWith(github.ref, 'refs/tags/v'))
           && 'ubuntu-latest' == matrix.os
-        uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02"
+        uses: "actions/upload-artifact@${{ vars.UPLOAD_ARTIFACT_VERSION }}"
         with:
           name: "docs-html"
           path: "build/docs/html"

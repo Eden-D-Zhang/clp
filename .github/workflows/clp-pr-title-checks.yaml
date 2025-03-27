@@ -26,6 +26,6 @@ jobs:
       pull-requests: "read"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: "amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017"
+      - uses: "amannn/action-semantic-pull-request@${{ vars.ACTION_SEMANTIC_PULL_REQUEST_VERSION }}"
         env:
           GITHUB_TOKEN: "${{secrets.GITHUB_TOKEN}}"
