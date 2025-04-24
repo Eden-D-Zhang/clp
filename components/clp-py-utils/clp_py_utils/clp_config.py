@@ -396,6 +396,14 @@ class S3Config(BaseModel):
         return field
 
 
+class S3IngestionConfig(BaseModel):
+    type: Literal[StorageType.S3.value] = StorageType.S3.value
+    aws_authentication: AwsAuthentication
+
+    def dump_to_primitive_dict(self):
+        d = self.dict()
+        return d
+
 class FsStorage(BaseModel):
     type: Literal[StorageType.FS.value] = StorageType.FS.value
     directory: pathlib.Path
@@ -597,7 +605,7 @@ class LogViewerWebUi(BaseModel):
 class CLPConfig(BaseModel):
     execution_container: Optional[str] = None
 
-    logs_input: Union[InputFsStorage, S3Storage] = InputFsStorage()
+    logs_input: Union[InputFsStorage, S3IngestionConfig] = InputFsStorage()
 
     package: Package = Package()
     database: Database = Database()
@@ -675,17 +683,16 @@ class CLPConfig(BaseModel):
 
     def validate_aws_config_dir(self):
         profile_auth_used = False
-        storage_configs = []
+        auth_configs = []
 
         if StorageType.S3 == self.logs_input.type:
-            storage_configs.append(self.logs_input)
+            auth_configs.append(self.logs_input.aws_authentication)
         if StorageType.S3 == self.archive_output.storage.type:
-            storage_configs.append(self.archive_output.storage)
+            auth_configs.append(self.archive_output.storage.s3_config.aws_authentication)
         if StorageType.S3 == self.stream_output.storage.type:
-            storage_configs.append(self.stream_output.storage)
+            auth_configs.append(self.stream_output.storage.s3_config.aws_authentication)
 
-        for storage in storage_configs:
-            auth = storage.s3_config.aws_authentication
+        for auth in auth_configs:
             if AwsAuthType.profile.value == auth.type:
                 profile_auth_used = True
                 break

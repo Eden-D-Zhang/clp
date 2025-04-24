@@ -12,6 +12,7 @@ import brotli
 import msgpack
 from clp_py_utils.clp_config import CLPConfig, COMPRESSION_JOBS_TABLE_NAME
 from clp_py_utils.pretty_size import pretty_size
+from clp_py_utils.s3_utils import parse_s3_url
 from clp_py_utils.sql_adapter import SQL_Adapter
 from job_orchestration.scheduler.constants import (
     CompressionJobCompletionStatus,
@@ -143,14 +144,16 @@ def _generate_clp_io_config(
         )
     elif InputType.S3 == input_type:
         if len(logs_to_compress) != 1:
-            raise ValueError(f"Too many key prefixes: {len(logs_to_compress)} > 1")
+            raise ValueError(f"Too many URLs: {len(logs_to_compress)} > 1")
 
-        s3_config = clp_config.logs_input.s3_config
+        s3_url = logs_to_compress[0]
+        region_code, bucket_name, key_prefix = parse_s3_url(s3_url)
+        aws_authentication = clp_config.logs_input.aws_authentication
         return S3InputConfig(
-            region_code=s3_config.region_code,
-            bucket=s3_config.bucket,
-            key_prefix=s3_config.key_prefix + logs_to_compress[0],
-            aws_authentication=s3_config.aws_authentication,
+            region_code=region_code,
+            bucket=bucket_name,
+            key_prefix=key_prefix,
+            aws_authentication=aws_authentication,
             timestamp_key=parsed_args.timestamp_key,
         )
     else:
