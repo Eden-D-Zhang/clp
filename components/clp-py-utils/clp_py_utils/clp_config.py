@@ -404,6 +404,7 @@ class S3IngestionConfig(BaseModel):
         d = self.dict()
         return d
 
+
 class FsStorage(BaseModel):
     type: Literal[StorageType.FS.value] = StorageType.FS.value
     directory: pathlib.Path
