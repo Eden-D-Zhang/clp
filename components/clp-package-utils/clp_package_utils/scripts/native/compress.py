@@ -143,7 +143,9 @@ def _generate_clp_io_config(
             path_prefix_to_remove=str(CONTAINER_INPUT_LOGS_ROOT_DIR),
         )
     elif InputType.S3 == input_type:
-        if len(logs_to_compress) != 1:
+        if len(logs_to_compress) == 0:
+            raise ValueError(f"No URLs found.")
+        elif len(logs_to_compress) != 1:
             raise ValueError(f"Too many URLs: {len(logs_to_compress)} > 1")
 
         s3_url = logs_to_compress[0]
@@ -161,9 +163,6 @@ def _generate_clp_io_config(
 
 
 def _get_logs_to_compress(logs_list_path: pathlib.Path) -> List[str]:
-    # Define the path processing function based on the input type
-    process_path_func: typing.Callable[[str], str]
-
     # Read logs from the input file
     logs_to_compress = []
     with open(logs_list_path, "r") as f:

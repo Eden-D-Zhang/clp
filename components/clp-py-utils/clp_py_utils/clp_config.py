@@ -387,14 +387,6 @@ class S3Config(BaseModel):
             raise ValueError("bucket cannot be empty")
         return field
 
-    @validator("key_prefix")
-    def validate_key_prefix(cls, field):
-        if "" == field:
-            raise ValueError("key_prefix cannot be empty")
-        if not field.endswith("/"):
-            raise ValueError('key_prefix must end with "/"')
-        return field
-
 
 class S3IngestionConfig(BaseModel):
     type: Literal[StorageType.S3.value] = StorageType.S3.value
@@ -427,13 +419,6 @@ class FsStorage(BaseModel):
 class S3Storage(BaseModel):
     type: Literal[StorageType.S3.value] = StorageType.S3.value
     s3_config: S3Config
-
-    def dump_to_primitive_dict(self):
-        d = self.dict()
-        return d
-
-
-class OutputS3Storage(S3Storage):
     staging_directory: pathlib.Path
 
     @validator("staging_directory")
@@ -442,16 +427,29 @@ class OutputS3Storage(S3Storage):
             raise ValueError("staging_directory cannot be empty")
         return field
 
+    @root_validator
+    def validate_key_prefix(cls, values):
+        s3_config = values.get("s3_config")
+        if hasattr(s3_config, "key_prefix"):
+            key_prefix = s3_config.key_prefix
+            if "" == key_prefix:
+                raise ValueError("key_prefix cannot be empty")
+            if not key_prefix.endswith("/"):
+                raise ValueError('key_prefix must end with "/"')
+            return values
+        else:
+            raise ValueError("s3_config must have field key_prefix")
+
     def make_config_paths_absolute(self, clp_home: pathlib.Path):
         self.staging_directory = make_config_path_absolute(clp_home, self.staging_directory)
 
     def dump_to_primitive_dict(self):
-        d = super().dump_to_primitive_dict()
+        d = self.dict()
         d["staging_directory"] = str(d["staging_directory"])
         return d
 
 
-class InputFsStorage(FsStorage):
+class FsIngestionConfig(FsStorage):
     directory: pathlib.Path = pathlib.Path("/")
 
 
@@ -463,16 +461,16 @@ class StreamFsStorage(FsStorage):
     directory: pathlib.Path = CLP_DEFAULT_DATA_DIRECTORY_PATH / "streams"
 
 
-class ArchiveS3Storage(OutputS3Storage):
+class ArchiveS3Storage(S3Storage):
     staging_directory: pathlib.Path = CLP_DEFAULT_DATA_DIRECTORY_PATH / "staged-archives"
 
 
-class StreamS3Storage(OutputS3Storage):
+class StreamS3Storage(S3Storage):
     staging_directory: pathlib.Path = CLP_DEFAULT_DATA_DIRECTORY_PATH / "staged-streams"
 
 
 def _get_directory_from_storage_config(
-    storage_config: Union[FsStorage, OutputS3Storage],
+    storage_config: Union[FsStorage, S3Storage],
 ) -> pathlib.Path:
     storage_type = storage_config.type
     if StorageType.FS == storage_type:
@@ -484,7 +482,7 @@ def _get_directory_from_storage_config(
 
 
 def _set_directory_for_storage_config(
-    storage_config: Union[FsStorage, OutputS3Storage], directory
+    storage_config: Union[FsStorage, S3Storage], directory
 ) -> None:
     storage_type = storage_config.type
     if StorageType.FS == storage_type:
@@ -606,7 +604,7 @@ class LogViewerWebUi(BaseModel):
 class CLPConfig(BaseModel):
     execution_container: Optional[str] = None
 
-    logs_input: Union[InputFsStorage, S3IngestionConfig] = InputFsStorage()
+    logs_input: Union[FsIngestionConfig, S3IngestionConfig] = FsIngestionConfig()
 
     package: Package = Package()
     database: Database = Database()
