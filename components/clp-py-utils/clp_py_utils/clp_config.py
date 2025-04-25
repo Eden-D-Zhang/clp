@@ -430,15 +430,14 @@ class S3Storage(BaseModel):
     @root_validator
     def validate_key_prefix(cls, values):
         s3_config = values.get("s3_config")
-        if hasattr(s3_config, "key_prefix"):
-            key_prefix = s3_config.key_prefix
-            if "" == key_prefix:
-                raise ValueError("key_prefix cannot be empty")
-            if not key_prefix.endswith("/"):
-                raise ValueError('key_prefix must end with "/"')
-            return values
-        else:
+        if not hasattr(s3_config, "key_prefix"):
             raise ValueError("s3_config must have field key_prefix")
+        key_prefix = s3_config.key_prefix
+        if "" == key_prefix:
+            raise ValueError("key_prefix cannot be empty")
+        if not key_prefix.endswith("/"):
+            raise ValueError('key_prefix must end with "/"')
+        return values
 
     def make_config_paths_absolute(self, clp_home: pathlib.Path):
         self.staging_directory = make_config_path_absolute(clp_home, self.staging_directory)
