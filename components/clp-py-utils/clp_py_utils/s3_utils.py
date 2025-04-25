@@ -61,8 +61,6 @@ def get_credential_env_vars(auth: AwsAuthentication) -> Dict[str, str]:
     :raise: ValueError if auth type is not supported
     """
     env_vars: Optional[Dict[str, str]] = None
-    auth = config.aws_authentication
-
     aws_credentials: Optional[S3Credentials] = None
 
     if AwsAuthType.env_vars == auth.type:
