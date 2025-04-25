@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import boto3
 from botocore.config import Config
@@ -13,17 +13,22 @@ from clp_py_utils.clp_config import (
     CLPConfig,
     COMPRESSION_SCHEDULER_COMPONENT_NAME,
     COMPRESSION_WORKER_COMPONENT_NAME,
+    FsStorage,
     LOG_VIEWER_WEBUI_COMPONENT_NAME,
     QUERY_SCHEDULER_COMPONENT_NAME,
     QUERY_WORKER_COMPONENT_NAME,
     S3Config,
     S3Credentials,
+    S3Storage,
     StorageType,
 )
 from clp_py_utils.compression import FileMetadata
 
 # Constants
 AWS_ENDPOINT = "amazonaws.com"
+AWS_ENV_VAR_ACCESS_KEY_ID = "AWS_ACCESS_KEY_ID"
+AWS_ENV_VAR_SECRET_ACCESS_KEY = "AWS_SECRET_ACCESS_KEY"
+AWS_ENV_VAR_SESSION_TOKEN = "AWS_SESSION_TOKEN"
 
 
 def _get_session_credentials(aws_profile: Optional[str] = None) -> Optional[S3Credentials]:
@@ -32,7 +37,7 @@ def _get_session_credentials(aws_profile: Optional[str] = None) -> Optional[S3Cr
     :param aws_profile: Name of profile configured in ~/.aws directory
     :return: An S3Credentials object with access key pair and session token if applicable.
     """
-    aws_session = None
+    aws_session: Optional[boto3.Session] = None
     if aws_profile is not None:
         aws_session = boto3.Session(profile_name=aws_profile)
     else:
@@ -55,8 +60,10 @@ def get_credential_env_vars(auth: AwsAuthentication) -> Dict[str, str]:
     :return: A [str, str] Dict which access key pair and session token if applicable.
     :raise: ValueError if auth type is not supported
     """
-    env_vars: Dict[str, str] = None
-    aws_credentials: S3Credentials = None
+    env_vars: Optional[Dict[str, str]] = None
+    auth = config.aws_authentication
+
+    aws_credentials: Optional[S3Credentials] = None
 
     if AwsAuthType.env_vars == auth.type:
         # Environmental variables are already set
@@ -78,12 +85,12 @@ def get_credential_env_vars(auth: AwsAuthentication) -> Dict[str, str]:
         raise ValueError(f"Unsupported authentication type: {auth.type}")
 
     env_vars = {
-        "AWS_ACCESS_KEY_ID": aws_credentials.access_key_id,
-        "AWS_SECRET_ACCESS_KEY": aws_credentials.secret_access_key,
+        AWS_ENV_VAR_ACCESS_KEY_ID: aws_credentials.access_key_id,
+        AWS_ENV_VAR_SECRET_ACCESS_KEY: aws_credentials.secret_access_key,
     }
     aws_session_token = aws_credentials.session_token
     if aws_session_token is not None:
-        env_vars["AWS_SESSION_TOKEN"] = aws_session_token
+        env_vars[AWS_ENV_VAR_SESSION_TOKEN] = aws_session_token
     return env_vars
 
 
@@ -99,8 +106,9 @@ def generate_container_auth_options(
     :return: Tuple of (whether aws config mount is needed, credential env_vars to set).
     :raises: ValueError if environment variables are not set correctly.
     """
-    output_storages_by_component_type = []
+    storages_by_component_type: List[Union[S3Storage, FsStorage]] = []
     input_storage_needed = False
+    
     if component_type in (
         COMPRESSION_SCHEDULER_COMPONENT_NAME,
         COMPRESSION_WORKER_COMPONENT_NAME,
@@ -141,22 +149,23 @@ def generate_container_auth_options(
     credentials_env_vars = []
 
     if add_env_vars:
-        access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
-        secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        access_key_id = os.getenv(AWS_ENV_VAR_ACCESS_KEY_ID)
+        secret_access_key = os.getenv(AWS_ENV_VAR_SECRET_ACCESS_KEY)
         if access_key_id and secret_access_key:
             credentials_env_vars.extend(
                 (
-                    f"AWS_ACCESS_KEY_ID={access_key_id}",
-                    f"AWS_SECRET_ACCESS_KEY={secret_access_key}",
+                    f"{AWS_ENV_VAR_ACCESS_KEY_ID}={access_key_id}",
+                    f"{AWS_ENV_VAR_SECRET_ACCESS_KEY}={secret_access_key}",
                 )
             )
         else:
             raise ValueError(
-                "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables not set"
+                f"{AWS_ENV_VAR_ACCESS_KEY_ID} and {AWS_ENV_VAR_SECRET_ACCESS_KEY} "
+                "environment variables not set"
             )
-        if os.getenv("AWS_SESSION_TOKEN"):
+        if os.getenv(AWS_ENV_VAR_SESSION_TOKEN):
             raise ValueError(
-                "AWS_SESSION_TOKEN not supported for environmental variable credentials."
+                f"{AWS_ENV_VAR_SESSION_TOKEN} not supported for environmental variable credentials."
             )
 
     return (config_mount, credentials_env_vars)
@@ -164,7 +173,7 @@ def generate_container_auth_options(
 
 def _create_s3_client(s3_config: S3Config, boto3_config: Optional[Config] = None) -> boto3.client:
     auth = s3_config.aws_authentication
-    aws_session = None
+    aws_session: Optional[boto3.Session] = None
 
     if AwsAuthType.profile == auth.type:
         aws_session = boto3.Session(

@@ -41,8 +41,9 @@ clp-json currently supports the AWS authentication methods described below.
 
 :::{caution}
 Short-term [STS credentials][aws-sts-credentials] (which include a Session Token) are not supported
-directly. To use temporary credentials, use [named profiles](#named-profiles) (with
-IAM Identity Center authentication or IAM role assumption) to generate them dynamically instead.
+directly. Instead, use [named profiles](#named-profiles) (with IAM Identity Center authentication or
+IAM role assumption) which provide the required permissions and don't require specifying credentials
+directly.
 :::
 
 #### Long-term IAM user credentials
